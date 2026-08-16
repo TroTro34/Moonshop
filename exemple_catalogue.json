@@ -1,0 +1,12 @@
+[
+  {
+    "nom": "Fond_Montagne_01.jpg",
+    "chemin_serveur": "/wallpapers/fond_montagne_01.jpg",
+    "chemin_destination": "/storage/emulated/0/Pictures/Wallpapers/fond_montagne_01.jpg"
+  },
+  {
+    "nom": "Save_Pokemon_Emerald.sav",
+    "chemin_serveur": "/saves/pokemon_emerald.sav",
+    "chemin_destination": "/storage/emulated/0/MonShop/saves/pokemon_emerald.sav"
+  }
+]

@@ -1,0 +1,17 @@
+# Sorties de build PyInstaller
+build/
+dist/
+__pycache__/
+
+# Ressources rassemblées au moment du build (copiées depuis app/src/main/res/)
+tbj_buffy.ttf
+logo_moonshop_white.png
+
+# Binaire téléchargé au moment du build (40 Mo, n'a rien à faire dans le dépôt)
+cloudflared.exe
+cloudflared
+cloudflared.tgz
+
+# Icône macOS, fabriquée au build à partir de moonshop_icone.png
+moonshop.icns
+moonshop.iconset/

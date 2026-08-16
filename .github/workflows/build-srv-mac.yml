@@ -1,0 +1,75 @@
+name: Build Moonshop srv (macOS)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'srv/**'
+      - '.github/workflows/build-srv-mac.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Machine Intel volontairement : une app Intel tourne aussi sur Apple Silicon
+    # grâce à Rosetta, alors qu'une app Apple Silicon ne tourne pas du tout sur un
+    # Mac Intel. Un seul build couvre donc tout le parc.
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r srv/requirements.txt
+
+      - name: Vérifier le JavaScript de l'interface
+        run: |
+          python srv/verifier_ui.py ui_script.js
+          node --check ui_script.js
+
+      - name: Rassembler les ressources embarquées
+        run: |
+          cp app/src/main/res/font/tbj_buffy.ttf srv/
+          cp app/src/main/res/drawable/logo_moonshop_white.png srv/
+
+      - name: Fabriquer l'icône macOS
+        working-directory: srv
+        run: |
+          mkdir -p moonshop.iconset
+          for taille in 16 32 128 256 512; do
+            sips -z $taille $taille moonshop_icone.png --out moonshop.iconset/icon_${taille}x${taille}.png
+            sips -z $((taille * 2)) $((taille * 2)) moonshop_icone.png --out moonshop.iconset/icon_${taille}x${taille}@2x.png
+          done
+          iconutil -c icns moonshop.iconset -o moonshop.icns
+          test -f moonshop.icns
+
+      - name: Télécharger cloudflared
+        working-directory: srv
+        run: |
+          curl -fL -o cloudflared.tgz \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
+          tar -xzf cloudflared.tgz
+          chmod +x cloudflared
+          ./cloudflared --version
+
+      - name: Construire l'application
+        working-directory: srv
+        run: pyinstaller --noconfirm --clean MoonshopSrv.spec
+
+      - name: Compresser le bundle
+        working-directory: srv/dist
+        # `ditto` plutôt que `zip` : il préserve les attributs et les liens
+        # symboliques du bundle, qu'une compression ordinaire abîme.
+        run: ditto -c -k --sequesterRsrc --keepParent "Moonshop srv.app" MoonshopSrv-macOS.zip
+
+      - name: Récupérer l'application
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonshopSrv-macOS
+          path: srv/dist/MoonshopSrv-macOS.zip

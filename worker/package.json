@@ -1,0 +1,15 @@
+{
+  "name": "moonshop-annuaire",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Annuaire code -> adresse du tunnel pour Moonshop",
+  "scripts": {
+    "login": "wrangler login",
+    "qui": "wrangler whoami",
+    "kv": "wrangler kv namespace create ANNUAIRE",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}

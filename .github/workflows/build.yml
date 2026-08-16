@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MOONSHOP_KEYSTORE_BASE64: ${{ secrets.MOONSHOP_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Rendre gradlew exécutable
+        run: chmod +x gradlew
+
+      # La clé de publication n'est jamais dans le dépôt : elle arrive en base64 par
+      # les secrets. Absente, la compilation retombe sur la clé de debug et l'APK
+      # reste installable à la main — mais il ne doit pas être distribué ainsi.
+      - name: Reconstituer la clé de signature
+        if: ${{ env.MOONSHOP_KEYSTORE_BASE64 != '' }}
+        env:
+          MOONSHOP_KEYSTORE_BASE64: ${{ secrets.MOONSHOP_KEYSTORE_BASE64 }}
+        run: |
+          echo "$MOONSHOP_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/moonshop.jks"
+          echo "MOONSHOP_KEYSTORE_FILE=$RUNNER_TEMP/moonshop.jks" >> "$GITHUB_ENV"
+
+      - name: Compiler l'APK de publication
+        env:
+          MOONSHOP_KEYSTORE_PASSWORD: ${{ secrets.MOONSHOP_KEYSTORE_PASSWORD }}
+          MOONSHOP_KEY_ALIAS: ${{ secrets.MOONSHOP_KEY_ALIAS }}
+          MOONSHOP_KEY_PASSWORD: ${{ secrets.MOONSHOP_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      # Le nom porte la mise en garde : un artefact signé par la clé de debug ne doit
+      # pas pouvoir être diffusé par inadvertance, et rien dans le fichier lui-même
+      # ne le signale à l'œil nu.
+      - name: Nommer l'artefact selon la clé employée
+        id: nom
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.MOONSHOP_KEYSTORE_BASE64 }}" ]; then
+            echo "valeur=MoonshopApp" >> "$GITHUB_OUTPUT"
+          else
+            echo "valeur=MoonshopApp-CLE-DE-DEBUG-NE-PAS-DIFFUSER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Récupérer l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.nom.outputs.valeur }}
+          path: app/build/outputs/apk/release/app-release.apk

@@ -1,0 +1,54 @@
+name: Build Moonshop srv
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'srv/**'
+      - '.github/workflows/build-srv.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r srv/requirements.txt
+
+      # Un script cassé laisse la fenêtre s'afficher normalement et ne prive que du
+      # comportement : sans ce contrôle, le défaut ne se voit qu'une fois l'exe livré.
+      - name: Vérifier le JavaScript de l'interface
+        run: |
+          python srv/verifier_ui.py ui_script.js
+          node --check ui_script.js
+
+      - name: Rassembler les ressources embarquées
+        shell: pwsh
+        run: |
+          Copy-Item app/src/main/res/font/tbj_buffy.ttf srv/
+          Copy-Item app/src/main/res/drawable/logo_moonshop_white.png srv/
+
+      - name: Télécharger cloudflared
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile srv/cloudflared.exe
+          if ((Get-Item srv/cloudflared.exe).Length -lt 10MB) { throw "cloudflared.exe suspect (trop petit)" }
+
+      - name: Construire l'exe
+        working-directory: srv
+        run: pyinstaller --noconfirm --clean MoonshopSrv.spec
+
+      - name: Récupérer l'exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonshopSrv
+          path: srv/dist/MoonshopSrv.exe

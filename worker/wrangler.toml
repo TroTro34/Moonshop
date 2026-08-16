@@ -1,0 +1,17 @@
+name = "moonshop-annuaire"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Espace de stockage créé avec :
+#   npx wrangler kv namespace create ANNUAIRE
+[[kv_namespaces]]
+binding = "ANNUAIRE"
+id = "86734b22c5f743b2aca7452b01e97dd2"
+
+# Limitation de débit sur /resolve. Une console légitime interroge l'annuaire une
+# poignée de fois par session ; soixante essais par minute laissent donc toute la
+# marge nécessaire, tout en rendant le balayage de codes sans intérêt.
+[[ratelimits]]
+name = "LIMITE_RESOLUTION"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }

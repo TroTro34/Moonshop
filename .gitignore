@@ -1,0 +1,17 @@
+# Sorties de compilation
+build/
+.gradle/
+local.properties
+
+# Clés de signature : la clé de publication ne doit jamais entrer dans le dépôt.
+# Elle arrive par les secrets GitHub, et sa copie vit ailleurs, sauvegardée à part.
+# (app/debug.keystore est l'exception volontaire : publique par nature, elle est
+#  versionnée pour que deux compilations produisent la même signature d'essai.)
+*.jks
+*.keystore
+!app/debug.keystore
+
+# Environnements de développement
+.idea/
+*.iml
+.DS_Store

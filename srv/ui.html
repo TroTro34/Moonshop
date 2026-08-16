@@ -1,0 +1,1139 @@
+<meta charset="utf-8">
+<title>Moonshop srv</title>
+<style>
+  /* Palette reprise telle quelle du thème « Fire Flower » de l'appli Android,
+     pour que le PC et la console se ressemblent au premier coup d'œil. */
+  :root {
+    --rouge: #D6432A;
+    --accent: #FFC107;
+    --fond: #FFFFFF;
+    --surface: #FFF7EA;
+    --texte: #2A2320;
+    --blanc: #FFFFFF;
+    --feston: 26px;
+  }
+
+  @font-face {
+    font-family: 'Moonshop';
+    src: url(data:font/ttf;base64,{{POLICE}}) format('truetype');
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--fond);
+    color: var(--texte);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    /* Rappel discret du fond à motifs de l'appli (étoiles et pièces à 7 % d'opacité). */
+    background-image:
+      radial-gradient(circle at 12px 12px, rgba(214, 67, 42, 0.07) 5px, transparent 6px),
+      radial-gradient(circle at 60px 52px, rgba(255, 193, 7, 0.10) 6px, transparent 7px);
+    background-size: 96px 96px;
+  }
+
+  /* Chaque page occupe toute la fenêtre ; une seule est visible à la fois. */
+  .page {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .page.active { display: flex; }
+
+  /* ---------- Bandeau festonné ---------- */
+  header {
+    background: var(--rouge);
+    padding: 18px 24px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+  }
+
+  header img { height: 34px; }
+
+  header h1 {
+    margin: 0;
+    font-family: 'Moonshop', 'Segoe UI', sans-serif;
+    font-weight: normal;
+    font-size: 26px;
+    letter-spacing: 0.5px;
+    color: var(--blanc);
+    flex: 1;
+  }
+
+  .retour {
+    background: transparent;
+    border: none;
+    color: var(--blanc);
+    font-size: 24px;
+    line-height: 1;
+    padding: 2px 8px;
+    border-radius: 8px;
+  }
+
+  .retour:hover { background: rgba(255, 255, 255, 0.18); filter: none; }
+
+  .festons {
+    flex: none;
+    height: calc(var(--feston) / 2);
+    /* Demi-disques jointifs : le disque fait exactement la largeur de la tuile,
+       comme les arcs dessinés au Canvas dans l'appli Android. */
+    background-image: radial-gradient(
+      circle at 50% 0,
+      var(--rouge) 0 calc(var(--feston) / 2),
+      transparent calc(var(--feston) / 2 + 0.5px)
+    );
+    background-size: var(--feston) calc(var(--feston) / 2);
+    background-repeat: repeat-x;
+  }
+
+  /* ---------- Corps ---------- */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .carte {
+    background: var(--surface);
+    border: 1px solid rgba(214, 67, 42, 0.20);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  .carte h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--rouge);
+  }
+
+  .chemin {
+    font-size: 14px;
+    word-break: break-all;
+    margin-bottom: 4px;
+  }
+
+  .vide { opacity: 0.55; font-style: italic; }
+
+  .detail { font-size: 12.5px; opacity: 0.65; }
+
+  /* ---------- Code d'appairage ---------- */
+  .code {
+    font-family: 'Moonshop', 'Segoe UI', sans-serif;
+    font-size: 46px;
+    letter-spacing: 0.16em;
+    color: var(--rouge);
+    text-align: center;
+    padding: 2px 0 6px;
+    user-select: text;
+    cursor: pointer;
+  }
+
+  .code.masque { letter-spacing: 0.10em; opacity: 0.35; }
+
+  .aide {
+    text-align: center;
+    font-size: 12.5px;
+    opacity: 0.7;
+    margin-bottom: 12px;
+  }
+
+  /* ---------- Interrupteur ---------- */
+  .interrupteur {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0 2px;
+  }
+
+  .interrupteur-texte { flex: 1; font-size: 13px; }
+  .interrupteur-texte small { display: block; opacity: 0.62; font-size: 11.5px; }
+
+  .bascule { position: relative; width: 44px; height: 24px; flex: none; }
+  .bascule input { opacity: 0; width: 0; height: 0; }
+
+  .bascule span {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(42, 35, 32, 0.22);
+    transition: background 0.18s;
+    cursor: pointer;
+  }
+
+  .bascule span::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    border-radius: 50%;
+    background: var(--blanc);
+    transition: transform 0.18s;
+  }
+
+  .bascule input:checked + span { background: var(--rouge); }
+  .bascule input:checked + span::before { transform: translateX(20px); }
+
+  /* ---------- Consoles appairées ---------- */
+  .appareil {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 2px;
+    border-top: 1px solid rgba(214, 67, 42, 0.14);
+  }
+
+  .appareil:first-child { border-top: none; }
+  .appareil-nom { flex: 1; font-weight: 600; font-size: 14px; }
+
+  /* Une demande en attente doit sauter aux yeux : c'est la seule chose de cette
+     fenêtre qui bloque quelqu'un, à l'autre bout, en train d'attendre. */
+  .demande {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 193, 7, 0.16);
+    border: 1px solid var(--accent);
+  }
+
+  .demande-texte { flex: 1; font-size: 13px; }
+  .demande-texte strong { display: block; font-size: 14px; }
+  .vide-appareils { font-size: 12.5px; opacity: 0.6; padding: 6px 0; }
+
+  /* ---------- Boutons ---------- */
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: filter 0.15s, opacity 0.15s;
+  }
+
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  .secondaire {
+    background: transparent;
+    border-color: var(--rouge);
+    color: var(--rouge);
+    font-weight: 600;
+  }
+
+  .principal {
+    background: var(--rouge);
+    color: var(--blanc);
+    font-weight: 700;
+    font-size: 17px;
+    padding: 15px;
+    width: 100%;
+    letter-spacing: 0.06em;
+  }
+
+  .rangee { display: flex; gap: 10px; align-items: center; }
+
+  .petit { padding: 6px 11px; font-size: 12.5px; }
+
+  /* ---------- Pastille d'état ---------- */
+  .etat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .pastille {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #B9AEA4;
+    flex: none;
+  }
+
+  .etat[data-etat="en_ligne"] .pastille { background: #2E8B57; }
+  .etat[data-etat="partiel"] .pastille { background: var(--accent); }
+  .etat[data-etat="demarrage"] .pastille { background: var(--accent); animation: pulse 1s infinite; }
+  .etat[data-etat="erreur"] .pastille { background: var(--rouge); }
+
+  @keyframes pulse { 50% { opacity: 0.25; } }
+
+  /* Repli affiché quand le code n'a pas pu être publié : l'adresse directe reste
+     utilisable, à coller dans « Server address » côté console. */
+  .repli {
+    display: none;
+    border-top: 1px dashed rgba(214, 67, 42, 0.35);
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+
+  .repli.visible { display: block; }
+
+  .repli p { margin: 0 0 8px; font-size: 12.5px; line-height: 1.45; }
+
+  .adresse {
+    font-family: Consolas, monospace;
+    font-size: 11.5px;
+    word-break: break-all;
+    background: rgba(214, 67, 42, 0.07);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    user-select: text;
+  }
+
+  .pied {
+    margin-top: auto;
+    padding-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .journal {
+    font-size: 12px;
+    opacity: 0.6;
+    min-height: 16px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .locale {
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .locale.visible { display: flex; }
+  .locale code { font-family: Consolas, monospace; font-size: 11.5px; user-select: text; }
+
+  /* ---------- Bloc bibliothèque (cœur de l'appli) ---------- */
+  .heros { padding: 18px; }
+
+  .heros-haut {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .heros h2 { margin: 0 0 4px; }
+
+  .heros-texte { min-width: 0; flex: 1; }
+
+  .heros-chiffres {
+    font-family: 'Moonshop', 'Segoe UI', sans-serif;
+    font-size: 21px;
+    color: var(--texte);
+    line-height: 1.15;
+  }
+
+  .heros .chemin {
+    font-size: 12px;
+    opacity: 0.65;
+    margin: 4px 0 0;
+  }
+
+  .pochette.grande {
+    width: 74px;
+    height: 56px;
+    margin: 0;
+    flex: none;
+  }
+
+  .pochette.grande::before { width: 32px; height: 11px; top: -8px; }
+  .pochette.grande::after { top: 17px; height: 5px; }
+
+  .lien {
+    background: transparent;
+    border: none;
+    color: var(--rouge);
+    font-size: 12.5px;
+    text-decoration: underline;
+    padding: 8px 0 0;
+    width: 100%;
+  }
+
+  .lien:hover:not(:disabled) { filter: none; opacity: 0.75; }
+
+  /* ---------- Page des fichiers ---------- */
+  .barre {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+  }
+
+  .fil {
+    flex: 1;
+    font-size: 13px;
+    word-break: break-all;
+  }
+
+  .fil span { cursor: pointer; color: var(--rouge); font-weight: 600; }
+  .fil span:hover { text-decoration: underline; }
+  .fil .ici { color: var(--texte); cursor: default; font-weight: 400; }
+  .fil .ici:hover { text-decoration: none; }
+
+  .grille {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 12px;
+  }
+
+  /* Vignette de dossier : le rabat est dessiné en CSS, pas d'icône importée. */
+  .dossier {
+    background: var(--surface);
+    border: 1px solid rgba(214, 67, 42, 0.20);
+    border-radius: 12px;
+    padding: 12px 10px 10px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+
+  .dossier:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(214, 67, 42, 0.18);
+  }
+
+  .pochette {
+    width: 54px;
+    height: 40px;
+    margin: 0 auto 8px;
+    position: relative;
+    background: var(--rouge);
+    border-radius: 5px 7px 7px 7px;
+  }
+
+  .pochette::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 0;
+    width: 24px;
+    height: 8px;
+    background: var(--rouge);
+    border-radius: 4px 6px 0 0;
+  }
+
+  .pochette::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 12px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .dossier .titre {
+    font-size: 12.5px;
+    font-weight: 600;
+    word-break: break-word;
+    line-height: 1.25;
+  }
+
+  .dossier .compte { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+
+  .outils {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: none;
+    gap: 2px;
+  }
+
+  .dossier:hover .outils, .ligne:hover .outils { display: flex; }
+
+  .action {
+    border: none;
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--rouge);
+    font-size: 13px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    line-height: 1;
+  }
+
+  .action:hover:not(:disabled) { background: rgba(214, 67, 42, 0.15); filter: none; }
+
+  .titre-section {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--rouge);
+    opacity: 0.8;
+  }
+
+  .liste {
+    border: 1px solid rgba(214, 67, 42, 0.18);
+    border-radius: 12px;
+    background: var(--blanc);
+    overflow: hidden;
+  }
+
+  .ligne {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(214, 67, 42, 0.10);
+    font-size: 13.5px;
+    position: relative;
+  }
+
+  .ligne:last-child { border-bottom: none; }
+  .ligne:hover { background: rgba(214, 67, 42, 0.05); }
+
+  .ligne .nom { flex: 1; word-break: break-all; }
+  .ligne.sans-image .nom, .dossier.sans-image .titre { opacity: 0.62; font-style: italic; }
+  .ligne .poids { font-size: 11.5px; opacity: 0.55; white-space: nowrap; }
+
+  .ligne .outils { position: static; display: flex; visibility: hidden; }
+  .ligne:hover .outils { visibility: visible; }
+
+  /* Feuille de jeu : rectangle au coin plié, dans l'esprit des cartes de l'appli. */
+  .feuille {
+    width: 20px;
+    height: 25px;
+    flex: none;
+    background: var(--rouge);
+    border-radius: 3px;
+    position: relative;
+    opacity: 0.85;
+  }
+
+  .feuille::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    border-width: 0 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent var(--blanc) transparent;
+  }
+
+  .vide-liste { padding: 16px 14px; font-size: 13px; opacity: 0.55; font-style: italic; }
+
+  .saisie {
+    flex: 1;
+    font: inherit;
+    padding: 5px 8px;
+    border: 1px solid var(--rouge);
+    border-radius: 7px;
+    background: var(--blanc);
+    color: var(--texte);
+    min-width: 0;
+  }
+
+  .danger { color: #B3261E; font-weight: 600; }
+
+  .erreur-fichiers {
+    font-size: 12.5px;
+    color: #B3261E;
+    min-height: 15px;
+  }
+
+  /* Zone de dépôt : un pointillé discret, affiché seulement si le glisser-déposer
+     a pu être branché sur la fenêtre native. */
+  .zone-depot {
+    display: none;
+    border: 2px dashed rgba(214, 67, 42, 0.35);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+    font-size: 12.5px;
+    opacity: 0.75;
+  }
+
+  .zone-depot.visible { display: block; }
+
+  .import { display: flex; flex-direction: column; gap: 6px; }
+
+  .import-nom { font-size: 12.5px; }
+
+  .jauge {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(214, 67, 42, 0.15);
+    overflow: hidden;
+  }
+
+  .jauge-remplie {
+    height: 100%;
+    width: 0;
+    background: var(--rouge);
+    transition: width 0.2s;
+  }
+</style>
+
+<!-- ============================ Page d'accueil ============================ -->
+<div class="page active" id="pageAccueil">
+  <header>
+    <img src="data:image/png;base64,{{LOGO}}" alt="">
+    <h1>MOONSHOP SRV</h1>
+  </header>
+  <div class="festons"></div>
+
+  <main>
+    <section class="carte heros">
+      <div class="heros-haut">
+        <div class="pochette grande"></div>
+        <div class="heros-texte">
+          <h2>Your library</h2>
+          <div class="heros-chiffres" id="contenu">No folder selected</div>
+          <div class="chemin vide" id="chemin">Choose the folder holding your games</div>
+        </div>
+      </div>
+      <button class="principal" id="ouvrirFichiers" disabled>MANAGE FILES</button>
+      <button class="lien" id="choisir">Choose another folder…</button>
+    </section>
+
+    <section class="carte">
+      <h2>Your code</h2>
+      <div class="code masque" id="code" title="Click to copy">------</div>
+      <div class="aide">Type this code once on your console — it never changes.</div>
+      <div class="rangee" style="justify-content:center">
+        <button class="secondaire" id="copier">Copy code</button>
+        <button class="lien" id="changerCode">Change code</button>
+      </div>
+
+      <div class="interrupteur">
+        <div class="interrupteur-texte">
+          Cloudflare tunnel
+          <small id="tunnelAide">On: your console reaches this PC from anywhere.</small>
+        </div>
+        <label class="bascule">
+          <input type="checkbox" id="tunnel" checked>
+          <span></span>
+        </label>
+      </div>
+
+      <div class="repli" id="repli">
+        <p><strong>The directory is unreachable</strong>, so this code leads nowhere for now.
+           Your games are shared all the same — use this address on your console:</p>
+        <div class="adresse" id="adresse"></div>
+        <div class="rangee" style="justify-content:center">
+          <button class="secondaire" id="copierAdresse">Copy address</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="carte" id="carteAppareils">
+      <h2>Consoles</h2>
+      <div class="aide">Your code lets a console ask; you decide here whether it gets in.</div>
+      <div id="demandes"></div>
+      <div id="appareils"></div>
+    </section>
+
+    <div class="pied">
+      <div class="etat" id="etat" data-etat="hors_ligne">
+        <span class="pastille"></span>
+        <span id="etatTexte">Offline</span>
+      </div>
+      <div class="locale" id="locale">
+        <span>On the same wifi, your console downloads directly from</span>
+        <code id="adresseLocale"></code>
+      </div>
+      <button class="principal" id="bascule" disabled>LAUNCH</button>
+      <div class="journal" id="journal"></div>
+      <div class="journal" id="avertissementFermeture" hidden>
+        Closing this window stops sharing.
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============================ Page des fichiers ============================ -->
+<div class="page" id="pageFichiers">
+  <header>
+    <button class="retour" id="retourAccueil" title="Back">←</button>
+    <h1>FILES</h1>
+  </header>
+  <div class="festons"></div>
+
+  <main>
+    <div class="barre">
+      <div class="fil" id="fil"></div>
+      <button class="secondaire petit" id="nouveauDossier">New folder</button>
+      <button class="principal petit" id="ajouterFichiers" style="width:auto">Add files</button>
+    </div>
+
+    <div class="zone-depot" id="zoneDepot">Drop files or folders anywhere in this window to add them here.</div>
+
+    <div class="import" id="import" hidden>
+      <div class="import-nom" id="importNom"></div>
+      <div class="jauge"><div class="jauge-remplie" id="importJauge"></div></div>
+    </div>
+
+    <div class="erreur-fichiers" id="erreurFichiers"></div>
+    <div class="grille" id="grille"></div>
+    <div class="titre-section" id="titreFichiers" hidden>Files</div>
+    <div class="liste" id="liste"></div>
+  </main>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let etatCourant = 'hors_ligne';
+  let cheminCourant = '';
+  let dossierChoisi = false;
+  let importEnCours = false;
+
+  const echapper = (valeur) => {
+    const noeud = document.createElement('span');
+    noeud.textContent = valeur;
+    return noeud.innerHTML;
+  };
+
+  /* ---------- Etat pousse par Python ---------- */
+  function majEtat(etat) {
+    etatCourant = etat.etat;
+    dossierChoisi = !!etat.dossier;
+
+    $('chemin').textContent = etat.dossier || 'Choose the folder holding your games';
+    $('chemin').classList.toggle('vide', !etat.dossier);
+    $('contenu').textContent = etat.dossier
+      ? `${etat.jeux} game${etat.jeux === 1 ? '' : 's'} · ${etat.categories} console${etat.categories === 1 ? '' : 's'}`
+      : 'No folder selected';
+    $('ouvrirFichiers').disabled = !etat.dossier;
+
+    /* Import en cours : la jauge remplace le message, sinon une copie de plusieurs
+       minutes ne se signalerait que par une fenetre qui ne repond pas. */
+    const importe = !!etat.import_nom;
+    $('import').hidden = !importe;
+    if (importe) {
+      $('importNom').textContent = `Copying ${etat.import_nom}… ${etat.import_pourcentage} %`;
+      $('importJauge').style.width = etat.import_pourcentage + '%';
+    } else if (importEnCours) {
+      /* L'import vient de se terminer : la liste doit montrer les nouveaux fichiers. */
+      rafraichirFichiers();
+    }
+    importEnCours = importe;
+    $('zoneDepot').classList.toggle('visible', !!etat.depot_actif);
+    /* Sans icone dans la barre, fermer la fenetre coupe le partage : il faut le
+       dire, sinon un telechargement en cours s'interrompt sans explication. */
+    $('avertissementFermeture').hidden = !!etat.plateau_actif || !partage;
+
+    $('code').textContent = etat.code || '------';
+
+    const avecTunnel = etat.tunnel_actif !== false;
+    $('tunnel').checked = avecTunnel;
+    $('tunnelAide').textContent = avecTunnel
+      ? 'On: your console reaches this PC from anywhere.'
+      : 'Off: same wifi only, nothing goes through Cloudflare.';
+
+    const libelles = {
+      hors_ligne: 'Offline',
+      demarrage: 'Starting…',
+      en_ligne: 'Online — your console can install from anywhere',
+      partiel: 'Shared, but your code is not published',
+      erreur: 'Error'
+    };
+    $('etat').dataset.etat = etat.etat;
+    $('etatTexte').textContent = libelles[etat.etat] || etat.etat;
+
+    const enRepli = etat.etat === 'partiel' && !!etat.adresse;
+    $('repli').classList.toggle('visible', enRepli);
+    $('adresse').textContent = etat.adresse || '';
+    $('code').classList.toggle('masque', !etat.code || enRepli);
+
+    /* Adresse locale : purement informative, la console bascule toute seule dessus
+       quand elle est sur le meme reseau. */
+    const locale = etat.etat === 'en_ligne' && etat.adresse_locale;
+    $('locale').classList.toggle('visible', !!locale);
+    $('adresseLocale').textContent = locale ? etat.adresse_locale.split('/')[2] : '';
+
+    const partage = etat.etat === 'en_ligne' || etat.etat === 'partiel';
+    const bascule = $('bascule');
+    bascule.textContent = partage ? 'STOP' : 'LAUNCH';
+    bascule.disabled = !etat.dossier || etat.etat === 'demarrage';
+    $('choisir').disabled = partage || etat.etat === 'demarrage';
+
+    $('journal').textContent = etat.message || '';
+    dessinerAppareils(etat.demandes || [], etat.appareils || []);
+  }
+
+  /* Couper le tunnel enferme le partage sur le réseau local : c'est le choix de qui
+     préfère que rien ne transite par un tiers. */
+  $('tunnel').onchange = () => pywebview.api.basculer_tunnel($('tunnel').checked);
+
+  /* Changer de code oblige à le retaper sur chaque console : la confirmation évite
+     le clic malheureux à côté de « Copy code ». */
+  $('changerCode').onclick = () => {
+    if (confirm('Generate a new code? Your consoles will need the new one typed in again.')) {
+      pywebview.api.changer_code();
+    }
+  };
+
+  /* ---------- Consoles : demandes en attente et appareils autorisés ---------- */
+  function dessinerAppareils(demandes, appareils) {
+    const zoneDemandes = $('demandes');
+    zoneDemandes.replaceChildren();
+    demandes.forEach((demande) => {
+      const ligne = document.createElement('div');
+      ligne.className = 'demande';
+
+      const texte = document.createElement('div');
+      texte.className = 'demande-texte';
+      const nom = document.createElement('strong');
+      /* textContent et non innerHTML : le nom vient de la console, donc de
+         l'extérieur, et n'a pas à pouvoir écrire du HTML dans cette fenêtre. */
+      nom.textContent = demande.nom;
+      texte.append(nom, document.createTextNode('wants to connect'));
+
+      const accepter = document.createElement('button');
+      accepter.className = 'secondaire petit';
+      accepter.textContent = 'Approve';
+      accepter.onclick = () => pywebview.api.accepter_appareil(demande.id);
+
+      const refuser = document.createElement('button');
+      refuser.className = 'lien';
+      refuser.textContent = 'Deny';
+      refuser.onclick = () => pywebview.api.refuser_appareil(demande.id);
+
+      ligne.append(texte, accepter, refuser);
+      zoneDemandes.append(ligne);
+    });
+
+    const zoneAppareils = $('appareils');
+    zoneAppareils.replaceChildren();
+    if (!appareils.length) {
+      const vide = document.createElement('div');
+      vide.className = 'vide-appareils';
+      vide.textContent = 'No console approved yet.';
+      zoneAppareils.append(vide);
+      return;
+    }
+    appareils.forEach((appareil) => {
+      const ligne = document.createElement('div');
+      ligne.className = 'appareil';
+
+      const nom = document.createElement('span');
+      nom.className = 'appareil-nom';
+      nom.textContent = appareil.nom;
+
+      const retirer = document.createElement('button');
+      retirer.className = 'lien';
+      retirer.textContent = 'Remove';
+      retirer.onclick = () => pywebview.api.revoquer_appareil(appareil.id);
+
+      ligne.append(nom, retirer);
+      zoneAppareils.append(ligne);
+    });
+  }
+
+  /* ---------- Navigation entre les deux pages ---------- */
+  function afficherPage(identifiant) {
+    document.querySelectorAll('.page').forEach((page) => {
+      page.classList.toggle('active', page.id === identifiant);
+    });
+  }
+
+  $('ouvrirFichiers').onclick = () => {
+    afficherPage('pageFichiers');
+    cheminCourant = '';
+    rafraichirFichiers();
+  };
+  $('retourAccueil').onclick = () => afficherPage('pageAccueil');
+
+  /* ---------- Actions de l'accueil ---------- */
+  $('choisir').onclick = () => pywebview.api.choisir_dossier();
+  $('bascule').onclick = () => {
+    if (etatCourant === 'en_ligne' || etatCourant === 'partiel') pywebview.api.arreter();
+    else pywebview.api.demarrer();
+  };
+
+  const copier = () => {
+    const code = $('code').textContent.trim();
+    if (!code || code === '------') return;
+    navigator.clipboard.writeText(code).then(() => {
+      $('journal').textContent = 'Code copied to clipboard.';
+    });
+  };
+  $('copier').onclick = copier;
+  $('code').onclick = copier;
+
+  $('copierAdresse').onclick = () => {
+    const adresse = $('adresse').textContent.trim();
+    if (!adresse) return;
+    navigator.clipboard.writeText(adresse).then(() => {
+      $('journal').textContent = 'Address copied to clipboard.';
+    });
+  };
+
+  /* ---------- Gestionnaire de fichiers ----------
+     Le dossier courant vit ici et nulle part ailleurs ; Python ne connait que des
+     chemins relatifs au dossier partage, qu'il revalide systematiquement. */
+  function erreurFichiers(message) {
+    $('erreurFichiers').textContent = message || '';
+  }
+
+  async function rafraichirFichiers() {
+    if (!dossierChoisi) return;
+    const reponse = await pywebview.api.lister_fichiers(cheminCourant);
+    if (reponse.erreur) {
+      /* Dossier disparu ou renomme hors de l'appli : on remonte a la racine
+         plutot que de laisser l'interface bloquee sur un chemin mort. */
+      erreurFichiers(reponse.erreur);
+      if (cheminCourant) { cheminCourant = ''; return rafraichirFichiers(); }
+      $('grille').innerHTML = '';
+      $('liste').innerHTML = '';
+      return;
+    }
+    erreurFichiers('');
+    cheminCourant = reponse.chemin || '';
+    /* Un fichier lache sur la fenetre arrive par la couche native, qui ignore ce
+       qui est affiche : on lui rappelle ou l'utilisateur se trouve. */
+    pywebview.api.definir_dossier_courant(cheminCourant);
+    dessinerFil();
+    dessinerContenu(reponse.entrees);
+  }
+
+  function dessinerFil() {
+    const fil = $('fil');
+    fil.innerHTML = '';
+    const morceaux = cheminCourant ? cheminCourant.split('/') : [];
+
+    const racine = document.createElement('span');
+    racine.textContent = 'Shared folder';
+    if (morceaux.length) racine.onclick = () => { cheminCourant = ''; rafraichirFichiers(); };
+    else racine.className = 'ici';
+    fil.appendChild(racine);
+
+    morceaux.forEach((morceau, i) => {
+      fil.appendChild(document.createTextNode('  ›  '));
+      const noeud = document.createElement('span');
+      noeud.textContent = morceau;
+      if (i === morceaux.length - 1) {
+        noeud.className = 'ici';
+      } else {
+        const cible = morceaux.slice(0, i + 1).join('/');
+        noeud.onclick = () => { cheminCourant = cible; rafraichirFichiers(); };
+      }
+      fil.appendChild(noeud);
+    });
+  }
+
+  function dessinerContenu(entrees) {
+    const dossiers = entrees.filter((e) => e.dossier);
+    const fichiers = entrees.filter((e) => !e.dossier);
+
+    const grille = $('grille');
+    grille.innerHTML = '';
+    dossiers.forEach((entree) => grille.appendChild(vignetteDossier(entree)));
+
+    $('titreFichiers').hidden = !fichiers.length;
+    const liste = $('liste');
+    liste.innerHTML = '';
+    if (!fichiers.length) {
+      liste.innerHTML = dossiers.length
+        ? '<div class="vide-liste">No file here — open a folder above.</div>'
+        : '<div class="vide-liste">This folder is empty.</div>';
+      return;
+    }
+    fichiers.forEach((entree) => liste.appendChild(ligneFichier(entree)));
+  }
+
+  function vignetteDossier(entree) {
+    const carte = document.createElement('div');
+    carte.className = entree.jaquette ? 'dossier' : 'dossier sans-image';
+    carte.innerHTML =
+      `<div class="outils">
+         <button class="action" title="${entree.jaquette ? 'Artwork on — click to turn off' : 'Artwork off — click to turn on'}">${entree.jaquette ? '🖼' : '🚫'}</button>
+         <button class="action" title="Rename">✎</button>
+         <button class="action" title="Delete">✕</button>
+       </div>
+       <div class="pochette"></div>
+       <div class="titre">${echapper(entree.nom)}</div>
+       <div class="compte">${entree.contenu} item${entree.contenu === 1 ? '' : 's'}</div>`;
+
+    carte.onclick = () => { cheminCourant = entree.chemin; rafraichirFichiers(); };
+    const [jaquette, renommer, supprimer] = carte.querySelectorAll('.action');
+    /* stopPropagation : sans lui, renommer un dossier l'ouvrirait aussitot. */
+    jaquette.onclick = (e) => { e.stopPropagation(); basculerJaquette(entree); };
+    renommer.onclick = (e) => { e.stopPropagation(); modeRenommer(carte, entree, true); };
+    supprimer.onclick = (e) => { e.stopPropagation(); modeSupprimer(carte, entree, true); };
+    return carte;
+  }
+
+  function ligneFichier(entree) {
+    const ligne = document.createElement('div');
+    ligne.className = entree.jaquette ? 'ligne' : 'ligne sans-image';
+    ligne.innerHTML =
+      `<span class="feuille"></span>
+       <span class="nom">${echapper(entree.nom)}</span>
+       <span class="poids">${echapper(entree.taille)}</span>
+       <span class="outils">
+         <button class="action" title="${entree.jaquette ? 'Artwork on — click to turn off' : 'Artwork off — click to turn on'}">${entree.jaquette ? '🖼' : '🚫'}</button>
+         <button class="action" title="Rename">✎</button>
+         <button class="action" title="Delete">✕</button>
+       </span>`;
+    const [jaquette, renommer, supprimer] = ligne.querySelectorAll('.action');
+    jaquette.onclick = () => basculerJaquette(entree);
+    renommer.onclick = () => modeRenommer(ligne, entree, false);
+    supprimer.onclick = () => modeSupprimer(ligne, entree, false);
+    return ligne;
+  }
+
+  /* Coupe ou retablit la recherche d'illustration. Marquer un dossier vaut pour
+     tout ce qu'il contient : un dossier de sauvegardes se regle en un geste. */
+  async function basculerJaquette(entree) {
+    const reponse = await pywebview.api.basculer_jaquette(entree.chemin);
+    if (reponse.erreur) erreurFichiers(reponse.erreur);
+    rafraichirFichiers();
+  }
+
+  /* Renommage sur place : pas de boite de dialogue systeme, qui casserait la
+     coherence visuelle et se comporte mal dans une WebView. */
+  function modeRenommer(noeud, entree, estDossier) {
+    noeud.onclick = null;
+    noeud.innerHTML = '';
+    const champ = document.createElement('input');
+    champ.className = 'saisie';
+    champ.value = entree.nom;
+    const valider = document.createElement('button');
+    valider.className = 'action';
+    valider.textContent = '✔';
+    const annuler = document.createElement('button');
+    annuler.className = 'action';
+    annuler.textContent = '✕';
+
+    if (estDossier) {
+      noeud.style.padding = '10px';
+      noeud.append(champ, valider, annuler);
+    } else {
+      noeud.append(champ, valider, annuler);
+    }
+    champ.focus();
+    /* Selectionne le nom sans l'extension : c'est presque toujours ce qu'on change. */
+    const point = estDossier ? -1 : entree.nom.lastIndexOf('.');
+    champ.setSelectionRange(0, point > 0 ? point : entree.nom.length);
+
+    const appliquer = async () => {
+      const nouveau = champ.value.trim();
+      if (!nouveau || nouveau === entree.nom) return rafraichirFichiers();
+      const reponse = await pywebview.api.renommer(entree.chemin, nouveau);
+      if (reponse.erreur) erreurFichiers(reponse.erreur);
+      rafraichirFichiers();
+    };
+    valider.onclick = (e) => { e.stopPropagation(); appliquer(); };
+    annuler.onclick = (e) => { e.stopPropagation(); rafraichirFichiers(); };
+    champ.onclick = (e) => e.stopPropagation();
+    champ.onkeydown = (e) => {
+      if (e.key === 'Enter') appliquer();
+      if (e.key === 'Escape') rafraichirFichiers();
+    };
+  }
+
+  /* Suppression definitive (pas de corbeille) : confirmation obligatoire, et le
+     nombre d'elements d'un dossier est annonce avant de le vider. */
+  async function modeSupprimer(noeud, entree, estDossier) {
+    let precision = '';
+    if (estDossier) {
+      const compte = await pywebview.api.compter_contenu(entree.chemin);
+      if (compte.total > 0) precision = ` and its ${compte.total} item${compte.total > 1 ? 's' : ''}`;
+    }
+    noeud.onclick = null;
+    noeud.innerHTML =
+      `<div class="nom" style="font-size:12.5px;line-height:1.35">
+         Delete <span class="danger">${echapper(entree.nom)}</span>${precision}?<br>This cannot be undone.
+       </div>`;
+
+    const confirmer = document.createElement('button');
+    confirmer.className = 'action danger';
+    confirmer.textContent = 'Delete';
+    const annuler = document.createElement('button');
+    annuler.className = 'action';
+    annuler.textContent = 'Cancel';
+    noeud.append(confirmer, annuler);
+
+    confirmer.onclick = async (e) => {
+      e.stopPropagation();
+      const reponse = await pywebview.api.supprimer(entree.chemin);
+      if (reponse.erreur) erreurFichiers(reponse.erreur);
+      rafraichirFichiers();
+    };
+    annuler.onclick = (e) => { e.stopPropagation(); rafraichirFichiers(); };
+  }
+
+  $('ajouterFichiers').onclick = () => {
+    if (!dossierChoisi) return;
+    pywebview.api.choisir_fichiers_a_importer(cheminCourant);
+  };
+
+  /* Le depot est traite cote natif (les vrais chemins disque) ; ici on empeche
+     seulement la WebView de tenter d'ouvrir le fichier lache. */
+  ['dragover', 'drop'].forEach((evenement) => {
+    window.addEventListener(evenement, (e) => e.preventDefault());
+  });
+
+  $('nouveauDossier').onclick = () => {
+    if (!dossierChoisi) return;
+    const grille = $('grille');
+    if (grille.querySelector('.nouveau')) return;
+    const carte = document.createElement('div');
+    carte.className = 'dossier nouveau';
+    carte.innerHTML = '<div class="pochette"></div>';
+    const champ = document.createElement('input');
+    champ.className = 'saisie';
+    champ.placeholder = 'Name';
+    champ.style.width = '100%';
+    const valider = document.createElement('button');
+    valider.className = 'action';
+    valider.textContent = '✔';
+    const annuler = document.createElement('button');
+    annuler.className = 'action';
+    annuler.textContent = '✕';
+    carte.append(champ, valider, annuler);
+    grille.prepend(carte);
+    champ.focus();
+
+    const creer = async () => {
+      const nom = champ.value.trim();
+      if (!nom) return rafraichirFichiers();
+      const reponse = await pywebview.api.creer_dossier(cheminCourant, nom);
+      if (reponse.erreur) erreurFichiers(reponse.erreur);
+      rafraichirFichiers();
+    };
+    valider.onclick = creer;
+    annuler.onclick = () => rafraichirFichiers();
+    champ.onkeydown = (e) => {
+      if (e.key === 'Enter') creer();
+      if (e.key === 'Escape') rafraichirFichiers();
+    };
+  };
+
+  window.addEventListener('pywebviewready', () => pywebview.api.etat_initial());
+</script>
