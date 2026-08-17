@@ -1,115 +1,110 @@
 # Moonshop
 
-Installer ses jeux sur une console Android depuis son propre PC, de n'importe où, sans
-compte à créer ni application tierce.
+Install games on an Android handheld from your own PC, from anywhere, with no account to
+create and no third-party app.
 
-Le projet tient en trois morceaux :
+The project comes in three parts:
 
-| | Rôle |
+| | Role |
 |---|---|
-| **`app/`** | L'application Android (Kotlin, Jetpack Compose) installée sur la console. |
-| **`srv/`** | **Moonshop srv**, l'application PC qui partage un dossier de jeux. Voir [srv/README.md](srv/README.md). |
-| **`worker/`** | L'annuaire, un Worker Cloudflare déployé une fois pour toutes. Voir [worker/README.md](worker/README.md). |
+| **`app/`** | The Android app (Kotlin, Jetpack Compose) that runs on the handheld. |
+| **`srv/`** | **Moonshop srv**, the PC app that shares a folder of games. See [srv/README.md](srv/README.md). |
+| **`worker/`** | The directory, a Cloudflare Worker deployed once and for all. See [worker/README.md](worker/README.md). |
 
-## Comment ça marche
+## Download
 
-Sur le PC, Moonshop srv sert le dossier choisi en HTTP local et ouvre un tunnel
-Cloudflare vers lui — aucun port n'est ouvert sur la box, la connexion part de la
-machine. L'adresse du tunnel change à chaque démarrage ; c'est pourquoi le PC publie
-« code → adresse du moment » dans l'annuaire, et la console retrouve son PC derrière un
-code de six caractères tapé une seule fois.
+Grab the latest [release](../../releases): the APK for the handheld, and Moonshop srv for
+Windows or macOS.
 
-Quand les deux appareils sont sur le même réseau, la console s'en aperçoit toute seule et
-télécharge en direct, sans détour par Cloudflare : le débit devient celui du wifi plutôt
-que celui de l'upload de la box.
+## How it works
 
-## Reprendre le projet
+On the PC, Moonshop srv serves the chosen folder over local HTTP and opens a Cloudflare
+tunnel to it — no port is opened on your router, the connection dials out from the
+machine. The tunnel address changes on every start, which is why the PC publishes
+"code → current address" to the directory, and the handheld finds its PC behind a
+six-character code typed once.
 
-L'annuaire déployé est celui de ce dépôt, et son quota est partagé : une copie du projet
-qui garde son adresse consomme celui-ci. Pour voler de ses propres ailes, déployer le
-sien — voir [worker/README.md](worker/README.md) — puis remplacer `URL_BASE` dans
-`app/src/main/java/com/monshop/app/Annuaire.kt` et `URL_ANNUAIRE` dans `srv/annuaire.py`.
+When both devices sit on the same network, the handheld notices on its own and downloads
+directly, skipping Cloudflare: throughput becomes your wifi's rather than your uplink's.
 
-Rien d'autre n'est partagé : les clés d'API appartiennent à chaque utilisateur, et le
-secret qui rattache un code à une machine est tiré localement, à la première ouverture.
+## Security
 
-## Sécurité
+**The code does not grant access, it requests it.** An unknown handheld files a request
+that you approve in front of your PC; it then receives a token of its own, revocable from
+the window. A code glimpsed over your shoulder is therefore not enough to download.
 
-**Le code ne donne pas l'accès, il le demande.** Une console inconnue dépose une demande
-que l'utilisateur accepte devant son PC ; elle reçoit alors un jeton qui n'appartient
-qu'à elle, révocable depuis la fenêtre. Un code aperçu par-dessus une épaule ne suffit
-donc pas à télécharger.
+**A code belongs to the machine that published it.** Every PC draws a secret on first
+launch; the directory keeps only its fingerprint and refuses any write that does not
+present it. Nobody can redirect a code to another server.
 
-**Un code appartient à la machine qui l'a publié.** Chaque PC tire un secret à sa
-première ouverture ; l'annuaire n'en retient que l'empreinte et refuse toute écriture qui
-ne la présente pas. Personne ne peut détourner un code vers un autre serveur.
+**Sharing is read-only**, confined to the chosen folder, and escaping that folder is
+blocked. The handheld has no way to write anything to the PC.
 
-**Le partage est en lecture seule**, limité au dossier choisi, et la sortie de ce dossier
-est bloquée. La console ne dispose d'aucun moyen d'écrire sur le PC.
+What remains, and is worth knowing: Cloudflare decrypts in transit, so it sees files
+transferred remotely; and the direct link on the local network is plain HTTP, readable by
+anyone sharing that network. Both are avoided by turning the tunnel off and staying on
+your own wifi.
 
-Ce qui reste, et qu'il faut savoir : Cloudflare déchiffre au passage, donc voit les
-fichiers transférés à distance ; et la liaison directe sur le réseau local est en HTTP
-simple, donc lisible par qui partage ce réseau.
+## API keys
 
-## Clés d'API
+Moonshop ships **no keys at all**. A key written into the app can be read by anyone who
+opens the file, then spent or revoked by a stranger. Everyone brings their own, requested
+one at a time by the first-launch wizard and editable later under *Settings → API*.
 
-Moonshop n'embarque **aucune clé**. Une clé écrite dans l'application serait lisible par
-quiconque ouvre le fichier, donc consommable et révocable par un tiers. Chacun fournit
-les siennes, demandées une par une par l'assistant de première ouverture, et modifiables
-ensuite dans *Settings → API keys*.
-
-| Service | Ce qu'on perd sans lui | Où l'obtenir |
+| Service | What you lose without it | Where to get it |
 |---|---|---|
-| **IGDB** | Descriptions, année, genre, studio, note | [console Twitch](https://dev.twitch.tv/console/apps/create) |
-| **SteamGridDB** | Jaquettes, bannières, logos | [profil SteamGridDB](https://www.steamgriddb.com/profile/preferences/api) |
-| **Google Drive** | La source Drive, alternative au PC | [Google Cloud](https://console.cloud.google.com/apis/credentials) |
+| **IGDB** | Descriptions, year, genre, studio, rating | [Twitch console](https://dev.twitch.tv/console/apps/create) |
+| **SteamGridDB** | Cover art, banners, logos | [SteamGridDB profile](https://www.steamgriddb.com/profile/preferences/api) |
+| **Google Drive** | The Drive source, an alternative to the PC | [Google Cloud](https://console.cloud.google.com/apis/credentials) |
 
-Sans aucune de ces clés, l'application installe les jeux normalement : elle affiche les
-noms de fichiers sur des tuiles unies, sans illustration ni description.
+With none of them, the app still installs games normally: it shows filenames on plain
+tiles, without artwork or descriptions.
 
-## Installer
+## Installing
 
-**Sur la console.** Moonshop se distribue en APK, hors magasin : il faut donc autoriser
-l'installation depuis la source qui sert le fichier (navigateur ou gestionnaire de
-fichiers), ce qu'Android propose au premier essai. L'appli demande une seule permission,
-l'accès à Internet.
+**On the handheld.** Moonshop is distributed as an APK, outside any store, so you need to
+allow installation from whatever serves the file — a browser or file manager — which
+Android offers on the first attempt. The app requests a single permission: internet access.
 
-**Sur le PC.** Moonshop srv n'a rien à installer : c'est un exécutable qu'on lance.
-Windows affiche un avertissement SmartScreen à la première ouverture, l'application
-n'étant pas signée par un éditeur enregistré — *Informations complémentaires* puis
-*Exécuter quand même*. Une version macOS est compilée à chaque changement mais n'a
-jamais été essayée en conditions réelles : la considérer comme expérimentale.
+**On the PC.** Moonshop srv installs nothing: it is an executable you run. Windows shows a
+SmartScreen warning on first launch, the app not being signed by a registered publisher —
+*More info*, then *Run anyway*. A macOS build is produced on every change but has never
+been tried in real conditions: treat it as experimental, and note it is neither signed nor
+notarised.
 
-Au premier lancement, un assistant demande le code du PC puis les clés d'API, une par
-une, avec un lien vers l'endroit où les obtenir. Chaque étape peut être passée.
+On first launch a wizard asks for the PC code, then the API keys one at a time, each with
+a link to where it is obtained. Every step can be skipped.
 
-## Compiler
+## Making it your own
 
-L'APK se construit à chaque poussée sur `main` (voir `.github/workflows/build.yml`) et
-sort en artefact. En local :
+The deployed directory is this repository's, and its quota is shared: a copy of the
+project that keeps the address consumes it. To stand on your own, deploy yours — see
+[worker/README.md](worker/README.md) — then replace `URL_BASE` in
+`app/src/main/java/com/monshop/app/Annuaire.kt` and `URL_ANNUAIRE` in `srv/annuaire.py`.
+
+Nothing else is shared: API keys belong to each user, and the secret binding a code to a
+machine is drawn locally on first launch.
+
+## Building
+
+The APK is built on every push to `main` (see `.github/workflows/build.yml`) and comes out
+as an artifact. Locally:
 
 ```bash
 ./gradlew assembleRelease
 ```
 
-Aucune clé privée n'est présente dans ce dépôt. Sans configuration, la version de
-publication est signée avec la clé de debug — suffisant pour installer à la main, pas
-pour distribuer largement, puisque cette clé est publique et permettrait à un tiers de
-forger une mise à jour qui s'installerait par-dessus.
+No private key lives in this repository. Without configuration, the release build is
+signed with the debug key — fine for installing by hand, never for distribution, since
+that key is public and would let anyone forge an update that installs over yours.
 
-Pour signer avec une vraie clé, renseigner ces variables d'environnement (ou les secrets
-GitHub Actions du même nom) : `MOONSHOP_KEYSTORE_FILE`, `MOONSHOP_KEYSTORE_PASSWORD`,
+To sign with a real key, set these environment variables (or the GitHub Actions secrets of
+the same name): `MOONSHOP_KEYSTORE_FILE`, `MOONSHOP_KEYSTORE_PASSWORD`,
 `MOONSHOP_KEY_ALIAS`, `MOONSHOP_KEY_PASSWORD`.
+
+Pushing a `v*` tag builds all three parts and publishes them as a release.
 
 ## Licence
 
-MIT, voir [LICENSE](LICENSE). Cela ne couvre que le code : ce que chacun choisit de
-partager avec Moonshop ne regarde que lui.
-
-## Ce qui reste à faire
-
-- Faire essayer la version macOS : elle se compile et son code tient compte du système,
-  mais personne ne l'a lancée. Elle n'est ni signée ni notariée.
-- Annulation d'un téléchargement en cours.
-- Chiffrement de bout en bout entre le PC et la console. Écarté pour l'instant : il
-  coûterait du débit là où le tunnel peut déjà être coupé au profit du réseau local.
+MIT, see [LICENSE](LICENSE). It covers the code only: what anyone chooses to share through
+Moonshop is their own business.

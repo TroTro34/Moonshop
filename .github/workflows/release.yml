@@ -1,0 +1,91 @@
+# Publication d'une version.
+#
+# Déclenchée par un tag « v… », elle relance les trois chaînes de compilation et
+# rassemble leurs résultats en une seule page de téléchargement. Reconstruire plutôt que
+# reprendre les artefacts du dernier commit garantit que les trois fichiers publiés
+# viennent tous du même état du code.
+name: Publier une version
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  windows:
+    uses: ./.github/workflows/build-srv.yml
+    secrets: inherit
+
+  macos:
+    uses: ./.github/workflows/build-srv-mac.yml
+    secrets: inherit
+
+  publier:
+    needs: [apk, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Récupérer les trois compilations
+        uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+
+      # Renommés avec la version : un « app-release.apk » dans le dossier de
+      # téléchargements de quelqu'un ne dit ni ce qu'il est, ni de quand il date.
+      - name: Rassembler et nommer les fichiers
+        run: |
+          version="${GITHUB_REF_NAME}"
+          mkdir -p publication
+          trouve() { find artefacts -type f -name "$1" | head -1; }
+
+          apk=$(trouve '*.apk')
+          exe=$(trouve '*.exe')
+          mac=$(trouve '*.zip')
+
+          [ -n "$apk" ] && cp "$apk" "publication/Moonshop-${version}.apk"
+          [ -n "$exe" ] && cp "$exe" "publication/MoonshopSrv-${version}-windows.exe"
+          [ -n "$mac" ] && cp "$mac" "publication/MoonshopSrv-${version}-macos.zip"
+
+          ls -lh publication
+          # Sans APK il n'y a rien à publier : mieux vaut échouer que sortir une
+          # version amputée dont personne ne remarquera le manque.
+          test -f "publication/Moonshop-${version}.apk"
+
+      - name: Créer la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME}"
+          cat > notes.md <<'FIN'
+          ## Installer
+
+          **Handheld** — download the `.apk` and open it. Android will ask once for
+          permission to install from that source. The app requests a single permission,
+          internet access.
+
+          **PC** — download `MoonshopSrv-…-windows.exe` and run it; nothing is installed.
+          Windows shows a SmartScreen warning on first launch (*More info* → *Run
+          anyway*), the app not being signed by a registered publisher.
+
+          **macOS** — experimental, never tried in real conditions. Unsigned, so macOS
+          will refuse it until you allow it under *System Settings → Privacy & Security*.
+
+          A wizard on first launch asks for your PC code, then your own API keys, each
+          with a link to where it is obtained. Every step can be skipped.
+
+          ## Note
+
+          Updating from a build older than this release requires uninstalling first: the
+          signing key changed.
+          FIN
+          gh release create "$version" publication/* \
+            --title "Moonshop $version" \
+            --notes-file notes.md

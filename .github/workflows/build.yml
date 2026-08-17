@@ -4,6 +4,8 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  # Appelable par la chaîne de publication, qui rassemble les trois.
+  workflow_call:
 
 jobs:
   build:
