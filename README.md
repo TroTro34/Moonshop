@@ -23,6 +23,16 @@ Quand les deux appareils sont sur le même réseau, la console s'en aperçoit to
 télécharge en direct, sans détour par Cloudflare : le débit devient celui du wifi plutôt
 que celui de l'upload de la box.
 
+## Reprendre le projet
+
+L'annuaire déployé est celui de ce dépôt, et son quota est partagé : une copie du projet
+qui garde son adresse consomme celui-ci. Pour voler de ses propres ailes, déployer le
+sien — voir [worker/README.md](worker/README.md) — puis remplacer `URL_BASE` dans
+`app/src/main/java/com/monshop/app/Annuaire.kt` et `URL_ANNUAIRE` dans `srv/annuaire.py`.
+
+Rien d'autre n'est partagé : les clés d'API appartiennent à chaque utilisateur, et le
+secret qui rattache un code à une machine est tiré localement, à la première ouverture.
+
 ## Sécurité
 
 **Le code ne donne pas l'accès, il le demande.** Une console inconnue dépose une demande
