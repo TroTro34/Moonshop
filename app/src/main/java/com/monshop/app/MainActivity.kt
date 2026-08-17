@@ -109,7 +109,11 @@ import kotlin.random.Random
  * (liste, jaquettes) se recomposent tout seuls dès qu'elle change.
  */
 object ServeurConfig {
-    const val URL_PAR_DEFAUT = "http://192.168.31.13:8080"
+    // Vide, pas une IP de secours : une IP de dev codée en dur ferait tenter une
+    // connexion réelle (donc un timeout de 10s, et le logo qui tourne pendant tout ce
+    // temps) au tout premier lancement, avant même que l'utilisateur ait un PC à
+    // joindre. Vide échoue instantanément (URL invalide), pas de tour pour rien.
+    const val URL_PAR_DEFAUT = ""
     var url by mutableStateOf(URL_PAR_DEFAUT)
 
     /** Enlève les espaces et le "/" final : les chemins du catalogue commencent déjà par "/". */
