@@ -20,7 +20,10 @@ import java.text.Normalizer
  *   la *bannière* (format large) pour le fond de la fiche, au lieu d'étirer une jaquette,
  *   le *logo* détouré, qui remplace le titre écrit par-dessus l'image.
  *
- * IGDB reste la source du texte, et son image le repli quand celle-ci ne trouve rien.
+ * IGDB reste la source du texte (année, genre, studio, note) mais plus jamais de
+ * l'image : les deux bases répondaient à des vitesses différentes, et l'image IGDB
+ * affichée en repli le temps que celle-ci arrive donnait un flash visible à chaque
+ * ouverture. Sans image ici, l'appli affiche l'icône par défaut plutôt que du IGDB.
  */
 object SteamGridDB {
 

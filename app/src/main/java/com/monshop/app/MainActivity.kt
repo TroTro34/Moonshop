@@ -96,6 +96,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.json.JSONObject
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -577,6 +579,33 @@ data class MetadonneesAffichees(
      *  ferait que clignoter à l'écran le temps que SteamGridDB réponde à son tour. */
     val imageCatalogue: String? = null
 )
+
+// ---------- Préchargement des images (IGDB texte + SteamGridDB illustrations) ----------
+// Lancé une fois le catalogue reçu, pour tout le catalogue d'un coup plutôt que jeu par
+// jeu au moment où sa tuile défile à l'écran : sans ça, chaque jeu affichait l'icône par
+// défaut le temps de son propre aller-retour réseau, à chaque fois qu'on faisait défiler
+// jusqu'à lui. Les deux services mettent en cache par titre (voir SteamGridDB.cache et
+// IGDBMetadataService.cache) : la tuile qui se compose ensuite lit un résultat déjà là
+// au lieu de le déclencher elle-même.
+//
+// Un seul permis à la fois par service limite la charge : lancer les centaines de
+// requêtes d'un coup (deux par jeu, pour un catalogue qui peut compter plusieurs
+// centaines de titres) saturerait la connexion et les quotas des deux API pour un
+// résultat invisible, l'écran n'affichant de toute façon que quelques tuiles à la fois.
+private val PermisPrechargement = Semaphore(4)
+
+suspend fun prechargerImages(catalogue: List<CatalogItem>) = coroutineScope {
+    for (item in catalogue) {
+        if (item.avecJaquette && !estFichierAccessoire(item.nom)) {
+            launch {
+                PermisPrechargement.withPermit {
+                    IGDBMetadataService.recuperer(item.nom, item.categorie)
+                    SteamGridDB.recuperer(item.nom)
+                }
+            }
+        }
+    }
+}
 
 /**
  * Renvoie l'image et la description à afficher pour un item : celles du catalogue
@@ -1267,6 +1296,10 @@ fun ShopScreen(themeActuel: ThemeOption, onChangerTheme: (ThemeOption) -> Unit) 
                     installer.recupererCatalogue()
                 }
                 rafraichirTousLesEtatsInstalles(catalogue)
+                // À part, sans attendre : ne doit pas retarder la fin du chargement
+                // (chargement = false ci-dessous) le temps que toutes les images
+                // arrivent, seulement les précéder pour quand on scrolle jusqu'à elles.
+                scope.launch { prechargerImages(catalogue) }
             } catch (e: Appairage.NonAppaire) {
                 // Autorisation révoquée depuis le PC : on oublie le jeton devenu
                 // inutile et on relance la demande, plutôt que de laisser l'écran
