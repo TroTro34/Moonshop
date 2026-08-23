@@ -621,7 +621,12 @@ fun rememberMetadonneesAffichees(item: CatalogItem): MetadonneesAffichees {
         // Adresse déjà complète (Google Drive) ou chemin relatif au serveur du PC.
         if (it.startsWith("http://") || it.startsWith("https://")) it else "${ServeurConfig.url}$it"
     }
-    val image = imageCatalogue ?: illustrations?.jaquette ?: auto?.image
+    // Jamais l'image IGDB ici : c'est ce que la grille (tuiles) et le fond de fiche
+    // affichent, et IGDB répond presque toujours avant SteamGridDB — l'utiliser en
+    // repli ferait donc apparaître sa jaquette partout avant d'être remplacée juste
+    // après, à chaque ouverture. IGDB ne sert plus que pour le texte (meta.fiche) :
+    // année, genre, studio, note.
+    val image = imageCatalogue ?: illustrations?.jaquette
     val description = item.description.ifBlank { auto?.description ?: "" }
     return MetadonneesAffichees(
         image = image,
