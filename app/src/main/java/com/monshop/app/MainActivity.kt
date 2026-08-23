@@ -92,6 +92,8 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -569,7 +571,11 @@ data class MetadonneesAffichees(
      *  toute la largeur donne un résultat déformé et flou. */
     val banniere: String? = null,
     /** Titre détouré du jeu, qui remplace le titre écrit quand il existe. */
-    val logo: String? = null
+    val logo: String? = null,
+    /** Image fournie par le PC lui-même (catalogue), avant tout enrichissement IGDB/
+     *  SteamGridDB. Sert de repli au fond de fiche : jamais l'image IGDB, qui ne
+     *  ferait que clignoter à l'écran le temps que SteamGridDB réponde à son tour. */
+    val imageCatalogue: String? = null
 )
 
 /**
@@ -594,18 +600,28 @@ fun rememberMetadonneesAffichees(item: CatalogItem): MetadonneesAffichees {
 
     LaunchedEffect(item.nom, item.categorie, chercherFiche) {
         if (chercherFiche) {
-            // La catégorie, c'est le nom du dossier, donc la console : c'est elle qui
-            // départage deux jeux au titre voisin sortis sur des machines différentes.
-            auto = IGDBMetadataService.recuperer(item.nom, item.categorie)
-            // Les deux bases sont interrogées : l'une sait dessiner, l'autre raconter.
-            illustrations = SteamGridDB.recuperer(item.nom)
+            // Les deux bases sont interrogées en parallèle plutôt que l'une après
+            // l'autre : IGDB répondait presque toujours en premier, ce qui affichait
+            // brièvement sa jaquette avant que SteamGridDB ne réponde à son tour et la
+            // remplace — un flash visible à chaque ouverture de fiche.
+            coroutineScope {
+                // La catégorie, c'est le nom du dossier, donc la console : c'est elle
+                // qui départage deux jeux au titre voisin sortis sur des machines
+                // différentes.
+                val ficheDiff = async { IGDBMetadataService.recuperer(item.nom, item.categorie) }
+                // L'une sait dessiner, l'autre raconter.
+                val illustrationsDiff = async { SteamGridDB.recuperer(item.nom) }
+                auto = ficheDiff.await()
+                illustrations = illustrationsDiff.await()
+            }
         }
     }
 
-    val image = item.image?.let {
+    val imageCatalogue = item.image?.let {
         // Adresse déjà complète (Google Drive) ou chemin relatif au serveur du PC.
         if (it.startsWith("http://") || it.startsWith("https://")) it else "${ServeurConfig.url}$it"
-    } ?: illustrations?.jaquette ?: auto?.image
+    }
+    val image = imageCatalogue ?: illustrations?.jaquette ?: auto?.image
     val description = item.description.ifBlank { auto?.description ?: "" }
     return MetadonneesAffichees(
         image = image,
@@ -613,7 +629,8 @@ fun rememberMetadonneesAffichees(item: CatalogItem): MetadonneesAffichees {
         fiche = auto,
         jaquetteLarge = illustrations?.jaquetteLarge,
         banniere = illustrations?.banniere,
-        logo = illustrations?.logo
+        logo = illustrations?.logo,
+        imageCatalogue = imageCatalogue
     )
 }
 
@@ -1751,8 +1768,11 @@ fun EcranDetail(
         // La même image sert de décor et d'illustration : c'est elle qui donne son
         // identité à la page, et chaque jeu se reconnaît d'un coup d'œil.
         // La bannière est faite pour ça : format large, composition pensée pour un
-        // fond. À défaut, la jaquette verticale, moins flatteuse une fois étirée.
-        val fondHeros = meta.banniere ?: meta.image
+        // fond. À défaut, la jaquette large SteamGridDB, puis l'image du catalogue
+        // (fournie par le PC). Jamais l'image IGDB : elle arrivait presque toujours
+        // avant SteamGridDB et se serait affichée un instant avant d'être remplacée —
+        // le fond n'apparaît maintenant qu'une fois SteamGridDB prêt, ou pas du tout.
+        val fondHeros = meta.banniere ?: meta.jaquetteLarge ?: meta.imageCatalogue
         if (fondHeros != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(fondHeros).crossfade(300).build(),
